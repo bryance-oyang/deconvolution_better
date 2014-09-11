@@ -47,7 +47,7 @@ uint16_t *read_tiff16(char *filename, int *width, int *height)
 	}
 
 	TIFFClose(tif);
-	return result;
+	goto out;
 
 out_read_err:
 	free(result);
@@ -55,7 +55,9 @@ out_nomem:
 out_wrong_format:
 	TIFFClose(tif);
 out_no_open:
-	return NULL;
+	result = NULL;
+out:
+	return result;
 }
 
 /*
@@ -104,7 +106,7 @@ uint8_t *read_tiff8(char *filename, int *width, int *height)
 	}
 
 	TIFFClose(tif);
-	return result;
+	goto out;
 
 out_read_err:
 	free(result);
@@ -112,7 +114,9 @@ out_nomem:
 out_wrong_format:
 	TIFFClose(tif);
 out_no_open:
-	return NULL;
+	result = NULL;
+out:
+	return result;
 }
 
 /* write tiff with 3 channels per pixel, RGB, 16-bit per channel */

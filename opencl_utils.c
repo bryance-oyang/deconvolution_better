@@ -31,7 +31,7 @@ char *cl_utils_read_file(char *filename)
 
 	fclose(file);
 	contents[size] = '\0';
-	return contents;
+	goto out;
 
 out_read_err:
 	free(contents);
@@ -39,7 +39,9 @@ out_nomem:
 out_info_err:
 	fclose(file);
 out_no_open:
-	return NULL;
+	contents = NULL;
+out:
+	return contents;
 }
 
 /*
@@ -50,6 +52,7 @@ out_no_open:
 int cl_utils_setup_gpu(cl_context *context, cl_command_queue
 		*command_queue, cl_device_id *device)
 {
+	int ret;
 	cl_int err;
 	cl_platform_id platform;
 
@@ -71,12 +74,15 @@ int cl_utils_setup_gpu(cl_context *context, cl_command_queue
 	if (err != CL_SUCCESS)
 		goto out_no_queue;
 
-	return 0;
+	ret = 0;
+	goto out;
 
 out_no_queue:
 	clReleaseContext(*context);
 out_err:
-	return -1;
+	ret = -1;
+out:
+	return ret;
 }
 
 /*
@@ -87,6 +93,7 @@ out_err:
 int cl_utils_create_program(cl_program *program, char *filename,
 		cl_context context, cl_device_id device)
 {
+	int ret;
 	cl_int err;
 	char *source_code;
 	size_t build_log_size;
@@ -132,12 +139,15 @@ int cl_utils_create_program(cl_program *program, char *filename,
 	}
 
 	free(source_code);
-	return 0;
+	ret = 0;
+	goto out;
 
 out_build_fail:
 	clReleaseProgram(*program);
 out_no_program:
 	free(source_code);
 out_no_source:
-	return -1;
+	ret = -1;
+out:
+	return ret;
 }
