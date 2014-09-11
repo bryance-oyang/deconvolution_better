@@ -11,82 +11,133 @@ char *cl_utils_read_file(char *filename)
 	char *contents;
 
 	if ((file = fopen(filename, "r")) == NULL)
-		return NULL;
+		goto out_no_open;
 	if (fseek(file, 0, SEEK_END) == -1)
-		return NULL;
+		goto out_info_err;
 	if ((size = ftell(file)) == -1)
-		return NULL;
+		goto out_info_err;
 	if (fseek(file, 0, SEEK_SET) == -1)
-		return NULL;
+		goto out_info_err;
 
-	contents = emalloc(size + 1);
+	contents = malloc(size + 1);
+	if (contents == NULL)
+		goto out_nomem;
 
 	fread(contents, 1, size, file);
 	if (ferror(file)) {
 		free(contents);
-		return NULL;
+		goto out_read_err;
 	}
 
 	fclose(file);
 	contents[size] = '\0';
 	return contents;
+
+out_read_err:
+	free(contents);
+out_nomem:
+out_info_err:
+	fclose(file);
+out_no_open:
+	return NULL;
 }
 
-/* creates opencl context and command queue using gpu device */
-void cl_utils_setup_gpu(cl_context *context, cl_command_queue
+/*
+ * creates opencl context and command queue using gpu device
+ * 
+ * returns 0 on success, anything else on failure
+ */
+int cl_utils_setup_gpu(cl_context *context, cl_command_queue
 		*command_queue, cl_device_id *device)
 {
+	cl_int err;
 	cl_platform_id platform;
 
-	clGetPlatformIDs(1, &platform, NULL);
-	clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 1, device, NULL);
+	err = clGetPlatformIDs(1, &platform, NULL);
+	if (err != CL_SUCCESS)
+		goto out_err;
 
-	*context = clCreateContext(0, 1, device, NULL, NULL, NULL);
-	*command_queue = clCreateCommandQueue(*context, *device, 0,
+	err = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 1, device,
 			NULL);
+	if (err != CL_SUCCESS)
+		goto out_err;
+
+	*context = clCreateContext(0, 1, device, NULL, NULL, &err);
+	if (err != CL_SUCCESS)
+		goto out_err;
+
+	*command_queue = clCreateCommandQueue(*context, *device, 0,
+			&err);
+	if (err != CL_SUCCESS)
+		goto out_no_queue;
+
+	return 0;
+
+out_no_queue:
+	clReleaseContext(*context);
+out_err:
+	return -1;
 }
 
-/* create a opencl program from source code in filename */
-cl_program cl_utils_create_program(char *filename, cl_context context,
-		cl_device_id device)
+/*
+ * create a opencl program from source code in filename
+ * 
+ * returns 0 on success, anything else otherwise
+ */
+int cl_utils_create_program(cl_program *program, char *filename,
+		cl_context context, cl_device_id device)
 {
 	cl_int err;
-	cl_program program;
 	char *source_code;
 	size_t build_log_size;
 	char *build_log;
 
-	if ((source_code = cl_utils_read_file(filename)) == NULL) {
+	source_code = cl_utils_read_file(filename);
+	if (source_code == NULL) {
 		fprintf(stderr, "cl_utils_create_program: could not read %s\n",
 				filename);
 		fflush(stderr);
-		exit(EXIT_FAILURE);
+		goto out_no_source;
 	}
 
-	program = clCreateProgramWithSource(context, 1,
+	*program = clCreateProgramWithSource(context, 1,
 			(const char **) &source_code, NULL, &err);
 	if (err != CL_SUCCESS) {
 		fprintf(stderr, "clCreateProgramWithSource failed\n");
 		fflush(stderr);
-		exit(EXIT_FAILURE);
+		goto out_no_program;
 	}
 
-	err = clBuildProgram(program, 1, &device, NULL, NULL, NULL);
+	err = clBuildProgram(*program, 1, &device, NULL, NULL, NULL);
 	if (err != CL_SUCCESS) {
 		fprintf(stderr, "clBuildProgram failed\n");
-		clGetProgramBuildInfo(program, device,
+
+		clGetProgramBuildInfo(*program, device,
 				CL_PROGRAM_BUILD_LOG, 0, NULL,
 				&build_log_size);
-		build_log = emalloc(build_log_size);
-		clGetProgramBuildInfo(program, device,
+		build_log = malloc(build_log_size);
+		if (build_log == NULL) {
+			fprintf(stderr, "No memory for build log\n");
+			fflush(stderr);
+			goto out_build_fail;
+		}
+
+		clGetProgramBuildInfo(*program, device,
 				CL_PROGRAM_BUILD_LOG, build_log_size,
 				build_log, NULL);
 		fprintf(stderr, "%s\n", build_log);
 		fflush(stderr);
 		free(build_log);
-		exit(EXIT_FAILURE);
+		goto out_build_fail;
 	}
 
 	free(source_code);
-	return program;
+	return 0;
+
+out_build_fail:
+	clReleaseProgram(*program);
+out_no_program:
+	free(source_code);
+out_no_source:
+	return -1;
 }
