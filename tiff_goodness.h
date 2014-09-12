@@ -1,10 +1,7 @@
 #ifndef _TIFF_GOODNESS_H_
 #define _TIFF_GOODNESS_H_
 
-#include <stdlib.h>
-#include <stdio.h>
 #include <stdint.h>
-#include <tiffio.h>
 
 uint16_t *read_tiff16(char *filename, int *width, int *height);
 uint8_t *read_tiff8(char *filename, int *width, int *height);

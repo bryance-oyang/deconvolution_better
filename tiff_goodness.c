@@ -1,5 +1,9 @@
 #include "tiff_goodness.h"
 
+#include <stdlib.h>
+#include <stdio.h>
+#include <tiffio.h>
+
 /*
  * read tiff, assumes tiff file has 3 channels per pixel, RGB,
  * with 16-bit channels

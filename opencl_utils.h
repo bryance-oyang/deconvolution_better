@@ -1,8 +1,6 @@
 #ifndef _OPEN_CL_UTILS_H_
 #define _OPEN_CL_UTILS_H_
 
-#include <stdlib.h>
-#include <stdio.h>
 #include <CL/opencl.h>
 
 int cl_utils_setup_gpu(cl_context *context, cl_command_queue

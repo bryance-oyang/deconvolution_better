@@ -1,3 +1,5 @@
+#include <stdlib.h>
+#include <stdio.h>
 #include "deconvolute.h"
 
 #define OUTPUT_FILENAME "deconvoluted_image.tif"

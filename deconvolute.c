@@ -1,5 +1,13 @@
 #include "deconvolute.h"
 
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <fftw3.h>
+#include <CL/opencl.h>
+#include "tiff_goodness.h"
+#include "opencl_utils.h"
+
 /********************************/
 /* STATIC VARS, PROTOTYPES, ETC */
 /********************************/
