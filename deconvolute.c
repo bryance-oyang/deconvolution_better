@@ -146,7 +146,7 @@ int init_images(char *input_image_filename, char *psf_image_filename)
 				x = (width - psf_width)/2 + i;
 				y = (height - psf_height)/2 + j;
 				index = y * width + x;
-				psf_index = j * psf_width + i;
+				psf_index = 3 * (j * psf_width + i) + c;
 
 				norm_psf_image[c][index] = (float)
 					psf_image[psf_index]/total[c];
