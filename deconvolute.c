@@ -276,6 +276,8 @@ int init_opencl()
 			goto out_no_kernel;
 	}
 
+	return 0;
+
 out_no_kernel:
 	for (c = 0; c < 3; c++) {
 		if (mult_k[c] != NULL)
