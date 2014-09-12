@@ -8,6 +8,10 @@
 #include "tiff_goodness.h"
 #include "opencl_utils.h"
 
+#define say_function_failed() \
+	fprintf(stderr, "%s: %s: failed\n", __FILE__, __func__); \
+	fflush(stderr);
+
 /********************************/
 /* STATIC VARS, PROTOTYPES, ETC */
 /********************************/
@@ -36,7 +40,7 @@ static float *fft_real;
 static fftwf_complex *fft_complex;
 
 /* opencl vars */
-static size_t global_work_size[1];
+static size_t global_work_size[2];
 static cl_device_id device;
 static cl_context context;
 static cl_command_queue queue;
@@ -46,8 +50,10 @@ static cl_kernel complex_mult_k[3];
 static cl_kernel complex_conj_mult_k[3];
 static cl_kernel divide_k[3];
 /* wait (sync) events */
+static cl_event copy_events[3][3];
 static cl_event kernel_events[3];
 /* opencl memory buffers */
+static cl_mem k_input_image[3];
 static cl_mem k_image_a[3];
 static cl_mem k_image_b[3];
 static cl_mem k_cimage_a[3][2];
@@ -65,12 +71,24 @@ static void cleanup_init_fftw();
 static int init_opencl();
 static void cleanup_init_opencl();
 
+static int copy_reusables_to_opencl();
+
+static void fft(float *in, float *out[2]);
+static void ifft(float *in[2], float *out);
+
 
 /******************/
 /* IMPLEMENTATION */
 /******************/
 
-/* returns 0 on success, anything else on failure */
+/*
+ * global function to deconvolute an image
+ *
+ * if any part of it fails, it will undo itself (goto styled stack-esque
+ * wind and unwind)
+ *
+ * returns 0 on success, anything else on failure
+ */
 int deconvolute_image(char *input_image_filename, char
 		*psf_image_filename, char *output_image_filename, int
 		n_iterations)
@@ -89,6 +107,11 @@ int deconvolute_image(char *input_image_filename, char
 	if (ret != 0)
 		goto out_no_init_opencl;
 
+	ret = copy_reusables_to_opencl();
+	if (ret != 0)
+		goto out_no_copy_reusables;
+
+out_no_copy_reusables:
 	cleanup_init_opencl();
 out_no_init_opencl:
 	cleanup_init_fftw();
@@ -98,13 +121,18 @@ out_no_init_images:
 	return ret;
 }
 
+/********************/
+/* STATIC FUNCTIONS */
+/********************/
+
+
 /*
  * read in images, alloc memory for real images, pad and normalize
  * psf
  *
  * returns 0 on success, anything else otherwise
  */
-int init_images(char *input_image_filename, char *psf_image_filename)
+static int init_images(char *input_image_filename, char *psf_image_filename)
 {
 	int i, j, c;
 	int psf_width, psf_height;
@@ -196,13 +224,13 @@ int init_images(char *input_image_filename, char *psf_image_filename)
 	return 0;
 
 out_err:
-	fprintf(stderr, "init_images: failed\n");
-	fflush(stderr);
+	say_function_failed();
 	cleanup_init_images();
 	return -1;
 }
 
-void cleanup_init_images()
+/* will only be called once */
+static void cleanup_init_images()
 {
 	int c, i;
 
@@ -241,7 +269,7 @@ void cleanup_init_images()
  *
  * returns 0 on success, anything else otherwise
  */
-int init_fftw()
+static int init_fftw()
 {
 	/* allocate memory for doing fft computations */
 	fft_real = fftwf_malloc(width * height * sizeof(*fft_real));
@@ -267,13 +295,13 @@ int init_fftw()
 	return 0;
 
 out_err:
-	fprintf(stderr, "init_fftw: failed\n");
-	fflush(stderr);
+	say_function_failed();
 	cleanup_init_fftw();
 	return -1;
 }
 
-void cleanup_init_fftw()
+/* will only be called once */
+static void cleanup_init_fftw()
 {
 	if (fft_backward_plan != NULL)
 		fftwf_destroy_plan(fft_backward_plan);
@@ -291,13 +319,14 @@ void cleanup_init_fftw()
  *
  * returns 0 on success, anything else otherwise
  */
-int init_opencl()
+static int init_opencl()
 {
 	int ret;
 	int c, i;
 
-	/* set global work size */
+	/* set global work sizes */
 	global_work_size[0] = width * height;
+	global_work_size[1] = width * (height/2 + 1);
 
 	/* setup context, queue, program, and kernels */
 	ret = cl_utils_setup_gpu(&context, &queue, &device);
@@ -328,6 +357,9 @@ int init_opencl()
 
 	/* allocate opencl buffers */
 	for (c = 0; c < 3; c++) {
+		k_input_image[c] = clCreateBuffer(context,
+				CL_MEM_READ_ONLY, width * height *
+				sizeof(cl_float), NULL, NULL);
 		k_image_a[c] = clCreateBuffer(context,
 				CL_MEM_READ_WRITE, width * height *
 				sizeof(cl_float), NULL, NULL);
@@ -335,6 +367,8 @@ int init_opencl()
 				CL_MEM_READ_WRITE, width * height *
 				sizeof(cl_float), NULL, NULL);
 
+		if (k_input_image[c] == NULL)
+			goto out_err;
 		if (k_image_a[c] == NULL)
 			goto out_err;
 		if (k_image_b[c] == NULL)
@@ -367,17 +401,19 @@ int init_opencl()
 	return 0;
 
 out_err:
-	fprintf(stderr, "init_opencl: failed\n");
-	fflush(stderr);
+	say_function_failed();
 	cleanup_init_opencl();
 	return -1;
 }
 
-void cleanup_init_opencl()
+/* will only be called once */
+static void cleanup_init_opencl()
 {
 	int c, i;
 
 	for (c = 0; c < 3; c++) {
+		if (k_input_image[c] != NULL)
+			clReleaseMemObject(k_input_image[c]);
 		if (k_image_a[c] != NULL)
 			clReleaseMemObject(k_image_a[c]);
 		if (k_image_b[c] != NULL)
@@ -407,4 +443,92 @@ void cleanup_init_opencl()
 		clReleaseProgram(program);
 
 	cl_utils_cleanup_gpu(&context, &queue);
+}
+
+/*
+ * copy reusable images to opencl buffers (also computes fft of psf
+ * before copying that)
+ *
+ * returns 0 on success, anything else on failure
+ */
+static int copy_reusables_to_opencl()
+{
+	int ret;
+	int c, i;
+
+	/* compute fft of psf */
+	for (c = 0; c < 3; c++) {
+		fft(psf_image[c], cimage_psf[c]);
+	}
+
+	for (c = 0; c < 3; c++) {
+		ret = clEnqueueWriteBuffer(queue, k_input_image[c],
+				CL_TRUE, 0, width * height *
+				sizeof(cl_float), input_image[c], 0,
+				NULL, &copy_events[c][2]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
+
+		for (i = 0; i < 2; i++) {
+			ret = clEnqueueWriteBuffer(queue,
+					k_cimage_psf[c][i], CL_TRUE, 0,
+					width * (height/2 + 1) *
+					sizeof(cl_float),
+					cimage_psf[c][i], 0, NULL,
+					&copy_events[c][i]);
+			if (ret != CL_SUCCESS)
+				goto out_err;
+		}
+
+		clWaitForEvents(3, copy_events[c]);
+	}
+
+	return 0;
+
+out_err:
+	say_function_failed();
+	return -1;
+}
+
+/*
+ * helper function to compute forward fft of real image data
+ *
+ * image must be width x height (static var)
+ */
+static void fft(float *in, float *out[2])
+{
+	int i;
+
+	for (i = 0; i < width * height; i++) {
+		fft_real[i] = in[i];
+	}
+
+	fftwf_execute(fft_forward_plan);
+
+	for (i = 0; i < width * (height/2 + 1); i++) {
+		out[0][i] = fft_complex[i][0];
+		out[1][i] = fft_complex[i][1];
+	}
+}
+
+/*
+ * helper function to compute inverse fft of complex image data
+ * to real image data
+ *
+ * image must be width x height (static var)
+ */
+static void ifft(float *in[2], float *out)
+{
+	int i;
+
+	for (i = 0; i < width * (height/2 + 1); i++) {
+		fft_complex[i][0] = in[0][i];
+		fft_complex[i][1] = in[1][i];
+	}
+
+	fftwf_execute(fft_backward_plan);
+
+	for (i = 0; i < width * height; i++) {
+		out[i] = fft_real[i];
+	}
 }
