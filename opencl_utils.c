@@ -78,15 +78,22 @@ int cl_utils_setup_gpu(cl_context *context, cl_command_queue
 
 out_no_queue:
 	clReleaseContext(*context);
+	*context = NULL;
 out_err:
 	return -1;
 }
 
-void cl_utils_cleanup_gpu(cl_context context, cl_command_queue
-		command_queue)
+void cl_utils_cleanup_gpu(cl_context *context, cl_command_queue
+		*command_queue)
 {
-	clReleaseCommandQueue(command_queue);
-	clReleaseContext(context);
+	if (*command_queue != NULL) {
+		clReleaseCommandQueue(*command_queue);
+		*command_queue = NULL;
+	}
+	if (*context != NULL) {
+		clReleaseContext(*context);
+		*context = NULL;
+	}
 }
 
 /*
@@ -146,6 +153,7 @@ int cl_utils_create_program(cl_program *program, char *filename,
 
 out_build_fail:
 	clReleaseProgram(*program);
+	*program = NULL;
 out_no_program:
 	free(source_code);
 out_no_source:

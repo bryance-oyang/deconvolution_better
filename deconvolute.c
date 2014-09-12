@@ -114,12 +114,12 @@ int init_images(char *input_image_filename, char *psf_image_filename)
 	original_input_image = read_tiff16(input_image_filename, &width,
 			&height);
 	if (original_input_image == NULL)
-		goto out_no_input_image;
+		goto out_err;
 
 	original_psf_image = read_tiff8(psf_image_filename, &psf_width,
 			&psf_height);
 	if (original_psf_image == NULL)
-		goto out_no_psf_image;
+		goto out_err;
 
 	/* alloc memory for images */
 	for (c = 0; c < 3; c++) {
@@ -137,17 +137,17 @@ int init_images(char *input_image_filename, char *psf_image_filename)
 				sizeof(*image_b[c]));
 
 		if (input_image[c] == NULL)
-			goto out_nomem;
+			goto out_err;
 		if (current_image[c] == NULL)
-			goto out_nomem;
+			goto out_err;
 		if (output_image[c] == NULL)
-			goto out_nomem;
+			goto out_err;
 		if (psf_image[c] == NULL)
-			goto out_nomem;
+			goto out_err;
 		if (image_a[c] == NULL)
-			goto out_nomem;
+			goto out_err;
 		if (image_b[c] == NULL)
-			goto out_nomem;
+			goto out_err;
 
 		/* alloc memory for complex images */
 		for (i = 0; i < 2; i++) {
@@ -159,11 +159,11 @@ int init_images(char *input_image_filename, char *psf_image_filename)
 					* sizeof(*cimage_psf[c][i]));
 
 			if (cimage_a[c][i] == NULL)
-				goto out_nomem;
+				goto out_err;
 			if (cimage_b[c][i] == NULL)
-				goto out_nomem;
+				goto out_err;
 			if (cimage_psf[c][i] == NULL)
-				goto out_nomem;
+				goto out_err;
 		}
 	}
 
@@ -195,7 +195,17 @@ int init_images(char *input_image_filename, char *psf_image_filename)
 
 	return 0;
 
-out_nomem:
+out_err:
+	fprintf(stderr, "init_images: failed\n");
+	fflush(stderr);
+	cleanup_init_images();
+	return -1;
+}
+
+void cleanup_init_images()
+{
+	int c, i;
+
 	for (c = 0; c < 3; c++) {
 		if (input_image[c] != NULL)
 			free(input_image[c]);
@@ -219,36 +229,11 @@ out_nomem:
 				free(cimage_psf[c][i]);
 		}
 	}
-	free(original_psf_image);
-out_no_psf_image:
-	free(original_input_image);
-out_no_input_image:
-	fprintf(stderr, "init_images: failed\n");
-	fflush(stderr);
-	return -1;
-}
 
-void cleanup_init_images()
-{
-	int c, i;
-
-	for (c = 0; c < 3; c++) {
-		free(psf_image[c]);
-		free(output_image[c]);
-		free(current_image[c]);
-		free(input_image[c]);
-		free(image_a[c]);
-		free(image_b[c]);
-
-		for (i = 0; i < 2; i++) {
-			free(cimage_a[c][i]);
-			free(cimage_b[c][i]);
-			free(cimage_psf[c][i]);
-		}
-	}
-
-	free(original_psf_image);
-	free(original_input_image);
+	if (original_psf_image != NULL)
+		free(original_psf_image);
+	if (original_input_image != NULL)
+		free(original_input_image);
 }
 
 /*
@@ -261,44 +246,43 @@ int init_fftw()
 	/* allocate memory for doing fft computations */
 	fft_real = fftwf_malloc(width * height * sizeof(*fft_real));
 	if (fft_real == NULL)
-		goto out_no_fft_real;
+		goto out_err;
 
 	fft_complex = fftwf_malloc(width * (height/2 + 1) *
 			sizeof(*fft_complex));
 	if (fft_complex == NULL)
-		goto out_no_fft_complex;
+		goto out_err;
 
 	/* create fftw plans for both forward and backward ffts */
 	fft_forward_plan = fftwf_plan_dft_r2c_2d(width, height,
 			fft_real, fft_complex, FFTW_MEASURE);
 	if (fft_forward_plan == NULL)
-		goto out_no_forward_plan;
+		goto out_err;
 
 	fft_backward_plan = fftwf_plan_dft_c2r_2d(width, height,
 			fft_complex, fft_real, FFTW_MEASURE);
 	if (fft_backward_plan == NULL)
-		goto out_no_backward_plan;
+		goto out_err;
 
 	return 0;
 
-out_no_backward_plan:
-	fftwf_destroy_plan(fft_forward_plan);
-out_no_forward_plan:
-	fftwf_free(fft_complex);
-out_no_fft_complex:
-	fftwf_free(fft_real);
-out_no_fft_real:
+out_err:
 	fprintf(stderr, "init_fftw: failed\n");
 	fflush(stderr);
+	cleanup_init_fftw();
 	return -1;
 }
 
 void cleanup_init_fftw()
 {
-	fftwf_destroy_plan(fft_backward_plan);
-	fftwf_destroy_plan(fft_forward_plan);
-	fftwf_free(fft_complex);
-	fftwf_free(fft_real);
+	if (fft_backward_plan != NULL)
+		fftwf_destroy_plan(fft_backward_plan);
+	if (fft_forward_plan != NULL)
+		fftwf_destroy_plan(fft_forward_plan);
+	if (fft_complex != NULL)
+		fftwf_free(fft_complex);
+	if (fft_real != NULL)
+		fftwf_free(fft_real);
 }
 
 /*
@@ -318,11 +302,11 @@ int init_opencl()
 	/* setup context, queue, program, and kernels */
 	ret = cl_utils_setup_gpu(&context, &queue, &device);
 	if (ret != 0)
-		goto out_gpu_fail;
+		goto out_err;
 
 	ret = cl_utils_create_program(&program, "arithmetic.cl", context, device);
 	if (ret != 0)
-		goto out_no_program;
+		goto out_err;
 
 	for (c = 0; c < 3; c++) {
 		mult_k[c] = clCreateKernel(program, "mult", NULL);
@@ -333,13 +317,13 @@ int init_opencl()
 		divide_k[c] = clCreateKernel(program, "divide", NULL);
 
 		if (mult_k[c] == NULL)
-			goto out_no_kernel;
+			goto out_err;
 		if (complex_mult_k[c] == NULL)
-			goto out_no_kernel;
+			goto out_err;
 		if (complex_conj_mult_k[c] == NULL)
-			goto out_no_kernel;
+			goto out_err;
 		if (divide_k[c] == NULL)
-			goto out_no_kernel;
+			goto out_err;
 	}
 
 	/* allocate opencl buffers */
@@ -352,9 +336,9 @@ int init_opencl()
 				sizeof(cl_float), NULL, NULL);
 
 		if (k_image_a[c] == NULL)
-			goto out_nomem;
+			goto out_err;
 		if (k_image_b[c] == NULL)
-			goto out_nomem;
+			goto out_err;
 
 		/* allocate complex buffers */
 		for (i = 0; i < 2; i++) {
@@ -372,17 +356,27 @@ int init_opencl()
 					sizeof(cl_float), NULL, NULL);
 
 			if (k_cimage_a[c][i] == NULL)
-				goto out_nomem;
+				goto out_err;
 			if (k_cimage_b[c][i] == NULL)
-				goto out_nomem;
+				goto out_err;
 			if (k_cimage_psf[c][i] == NULL)
-				goto out_nomem;
+				goto out_err;
 		}
 	}
 
 	return 0;
 
-out_nomem:
+out_err:
+	fprintf(stderr, "init_opencl: failed\n");
+	fflush(stderr);
+	cleanup_init_opencl();
+	return -1;
+}
+
+void cleanup_init_opencl()
+{
+	int c, i;
+
 	for (c = 0; c < 3; c++) {
 		if (k_image_a[c] != NULL)
 			clReleaseMemObject(k_image_a[c]);
@@ -397,7 +391,7 @@ out_nomem:
 				clReleaseMemObject(k_cimage_psf[c][i]);
 		}
 	}
-out_no_kernel:
+
 	for (c = 0; c < 3; c++) {
 		if (mult_k[c] != NULL)
 			clReleaseKernel(mult_k[c]);
@@ -408,37 +402,9 @@ out_no_kernel:
 		if (divide_k[c] != NULL)
 			clReleaseKernel(divide_k[c]);
 	}
-	clReleaseProgram(program);
-out_no_program:
-	cl_utils_cleanup_gpu(context, queue);
-out_gpu_fail:
-	fprintf(stderr, "init_opencl: failed\n");
-	fflush(stderr);
-	return -1;
-}
 
-void cleanup_init_opencl()
-{
-	int c, i;
+	if (program != NULL)
+		clReleaseProgram(program);
 
-	for (c = 0; c < 3; c++) {
-		clReleaseMemObject(k_image_a[c]);
-		clReleaseMemObject(k_image_b[c]);
-
-		for (i = 0; i < 2; i++) {
-			clReleaseMemObject(k_cimage_a[c][i]);
-			clReleaseMemObject(k_cimage_b[c][i]);
-			clReleaseMemObject(k_cimage_psf[c][i]);
-		}
-	}
-
-	for (c = 0; c < 3; c++) {
-		clReleaseKernel(mult_k[c]);
-		clReleaseKernel(complex_mult_k[c]);
-		clReleaseKernel(complex_conj_mult_k[c]);
-		clReleaseKernel(divide_k[c]);
-	}
-
-	clReleaseProgram(program);
-	cl_utils_cleanup_gpu(context, queue);
+	cl_utils_cleanup_gpu(&context, &queue);
 }
