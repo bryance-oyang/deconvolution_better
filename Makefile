@@ -3,9 +3,9 @@ srcdir=
 
 SHELL=/bin/sh
 CC=cc -pipe -mtune=native -march=native
-OFLAGS=-O2
+OFLAGS=-Os
 CFLAGS+=-std=c11 -Wall -pedantic-errors
-LDFLAGS=-lc -lOpenCL -ltiff -lfftw3
+LDFLAGS=-lc -lOpenCL -ltiff -lfftw3f
 CDEBUG=-g -p
 DFLAGS=$(CFLAGS) -M
 

@@ -4,7 +4,7 @@
  * reads a file and returns a malloced char* of its contents
  * that needs to freed
  */
-char *cl_utils_read_file(char *filename)
+static char *cl_utils_read_file(char *filename)
 {
 	FILE *file;
 	int size;
@@ -31,7 +31,7 @@ char *cl_utils_read_file(char *filename)
 
 	fclose(file);
 	contents[size] = '\0';
-	goto out;
+	return contents;
 
 out_read_err:
 	free(contents);
@@ -39,9 +39,7 @@ out_nomem:
 out_info_err:
 	fclose(file);
 out_no_open:
-	contents = NULL;
-out:
-	return contents;
+	return NULL;
 }
 
 /*
@@ -52,7 +50,6 @@ out:
 int cl_utils_setup_gpu(cl_context *context, cl_command_queue
 		*command_queue, cl_device_id *device)
 {
-	int ret;
 	cl_int err;
 	cl_platform_id platform;
 
@@ -74,15 +71,19 @@ int cl_utils_setup_gpu(cl_context *context, cl_command_queue
 	if (err != CL_SUCCESS)
 		goto out_no_queue;
 
-	ret = 0;
-	goto out;
+	return 0;
 
 out_no_queue:
 	clReleaseContext(*context);
 out_err:
-	ret = -1;
-out:
-	return ret;
+	return -1;
+}
+
+void cl_utils_cleanup_gpu(cl_context context, cl_command_queue
+		command_queue)
+{
+	clReleaseCommandQueue(command_queue);
+	clReleaseContext(context);
 }
 
 /*
@@ -93,7 +94,6 @@ out:
 int cl_utils_create_program(cl_program *program, char *filename,
 		cl_context context, cl_device_id device)
 {
-	int ret;
 	cl_int err;
 	char *source_code;
 	size_t build_log_size;
@@ -139,15 +139,12 @@ int cl_utils_create_program(cl_program *program, char *filename,
 	}
 
 	free(source_code);
-	ret = 0;
-	goto out;
+	return 0;
 
 out_build_fail:
 	clReleaseProgram(*program);
 out_no_program:
 	free(source_code);
 out_no_source:
-	ret = -1;
-out:
-	return ret;
+	return -1;
 }
