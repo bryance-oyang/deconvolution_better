@@ -130,12 +130,14 @@ int init_images(char *input_image_filename, char *psf_image_filename)
 			goto out_nomem;
 	}
 
-	/* convert input image over to float and compute total for
-	 * normalizing psf */
-	float total[3] = {0, 0, 0};
+	/* convert input image over to float */
 	for (i = 0; i < 3 * width * height; i++) {
 		norm_input_image[i%3][i/3] = (float)input_image[i]/UINT16_MAX;
 		norm_current_image[i%3][i/3] = (float)input_image[i]/UINT16_MAX;
+	}
+
+	float total[3] = {0, 0, 0};
+	for (i = 0; i < 3 * psf_width * psf_height; i++) {
 		total[i%3] += (float)psf_image[i];
 	}
 
@@ -198,6 +200,7 @@ void cleanup_init_images()
  */
 int init_fftw()
 {
+	/* allocate memory for doing fft computations */
 	fft_real = fftwf_malloc(width * height * sizeof(*fft_real));
 	if (fft_real == NULL)
 		goto out_no_fft_real;
@@ -207,6 +210,7 @@ int init_fftw()
 	if (fft_complex == NULL)
 		goto out_no_fft_complex;
 
+	/* create fftw plans for both forward and backward ffts */
 	fft_forward_plan = fftwf_plan_dft_r2c_2d(width, height,
 			fft_real, fft_complex, FFTW_MEASURE);
 	if (fft_forward_plan == NULL)
@@ -242,14 +246,18 @@ void cleanup_init_fftw()
 /*
  * create opencl context, queue, program, and kernels and alloc opencl
  * buffers
+ *
+ * returns 0 on success, anything else otherwise
  */
 int init_opencl()
 {
 	int ret;
 	int c;
 
+	/* set global work size */
 	global_work_size[0] = width * height;
 
+	/* setup context, queue, program, and kernels */
 	ret = cl_utils_setup_gpu(&context, &queue, &device);
 	if (ret != 0)
 		goto out_gpu_fail;
@@ -275,6 +283,9 @@ int init_opencl()
 		if (divide_k[c] == NULL)
 			goto out_no_kernel;
 	}
+
+	/* allocate opencl buffers */
+
 
 	return 0;
 
