@@ -74,6 +74,8 @@ static void cleanup_init_opencl();
 
 static int copy_reusables_to_opencl();
 
+static int do_iteration();
+
 static int cpsf_multiply(float *in[3][2], float *out[3][2]);
 static int image_input_divide(float *in[3], float *out[3]);
 static int cpsf_conj_multiply(float *in[3][2], float *out[3][2]);
@@ -87,7 +89,7 @@ static void ifft(float *in[2], float *out);
 /******************/
 
 /*
- * global function to deconvolute an image
+ * global function to deconvolute an image via Richardson–Lucy
  *
  * if any part of it fails, it will undo itself (goto styled stack-esque
  * wind and unwind)
@@ -99,7 +101,9 @@ int deconvolute_image(char *input_image_filename, char
 		n_iterations)
 {
 	int ret;
+	int i;
 
+	/* setup */
 	ret = init_images(input_image_filename, psf_image_filename);
 	if (ret != 0)
 		goto out_no_init_images;
@@ -116,6 +120,16 @@ int deconvolute_image(char *input_image_filename, char
 	if (ret != 0)
 		goto out_no_copy_reusables;
 
+	/* run deconvolution */
+	for (i = 0; i < n_iterations; i++) {
+		ret = do_iteration();
+		if (ret != 0)
+			goto out_iteration_failed;
+	}
+
+	/* output result */
+
+out_iteration_failed:
 out_no_copy_reusables:
 	cleanup_init_opencl();
 out_no_init_opencl:
@@ -500,6 +514,53 @@ static int copy_reusables_to_opencl()
 out_err:
 	say_function_failed();
 	return -1;
+}
+
+/* do one iteration of Richardson–Lucy deconvolution */
+static int do_iteration()
+{
+	int ret;
+	int c;
+
+	/* compute convolution of psf and current image */
+	for (c = 0; c < 3; c++) {
+		fft(current_image[c], cimage_a[c]);
+	}
+
+	ret = cpsf_multiply(cimage_a, cimage_b);
+	if (ret != 0)
+		goto out;
+
+	for (c = 0; c < 3; c++) {
+		ifft(cimage_b[c], image_a[c]);
+	}
+
+	/* compute original image/(convolution of psf and current image) */
+	ret = image_input_divide(image_a, image_b);
+	if (ret != 0)
+		goto out;
+
+	/* compute convolution of psf(-x) and previous result */
+	for (c = 0; c < 3; c++) {
+		fft(image_b[c], cimage_b[c]);
+	}
+
+	ret = cpsf_conj_multiply(cimage_b, cimage_a);
+	if (ret != 0)
+		goto out;
+
+	for (c = 0; c < 3; c++) {
+		ifft(cimage_a[c], image_a[c]);
+	}
+
+	/* multiply current image by previous result to get new current
+	 * image */
+	ret = image_multiply(current_image, image_a, current_image);
+	if (ret != 0)
+		goto out;
+
+out:
+	return ret;
 }
 
 /*
