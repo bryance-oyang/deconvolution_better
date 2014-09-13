@@ -15,6 +15,6 @@
  */ 
 int deconvolute_image(char *input_image_filename, char
 		*psf_image_filename, char *output_image_filename, int
-		n_iterations);
+		n_iterations, int n_threads);
 
 #endif /* _DECONVOLUTE_H_ */

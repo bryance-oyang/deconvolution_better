@@ -5,7 +5,7 @@ SHELL=/bin/sh
 CC=cc -pipe -mtune=native -march=native
 OFLAGS=-Os
 CFLAGS+=-std=c11 -Wall -pedantic-errors
-LDFLAGS=-lc -lOpenCL -ltiff -lfftw3f
+LDFLAGS=-lc -lOpenCL -ltiff -lfftw3f_threads -lfftw3f -lm -lpthread
 CDEBUG=-g -p
 DFLAGS=$(CFLAGS) -M
 

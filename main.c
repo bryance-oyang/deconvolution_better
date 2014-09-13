@@ -12,7 +12,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (deconvolute_image(argv[1], argv[2], OUTPUT_FILENAME,
-			atoi(argv[3])) != 0) {
+			atoi(argv[3]), 8) != 0) {
 		return EXIT_FAILURE;
 	}
 

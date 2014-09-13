@@ -65,7 +65,7 @@ static int init_images(char *input_image_filename, char
 		*psf_image_filename);
 static void cleanup_init_images();
 
-static int init_fftw();
+static int init_fftw(int n_threads);
 static void cleanup_init_fftw();
 
 static int init_opencl();
@@ -103,7 +103,7 @@ static void ifft(float *in[2], float *out);
  */
 int deconvolute_image(char *input_image_filename, char
 		*psf_image_filename, char *output_image_filename, int
-		n_iterations)
+		n_iterations, int n_threads)
 {
 	int ret;
 	int i;
@@ -113,7 +113,7 @@ int deconvolute_image(char *input_image_filename, char
 	if (ret != 0)
 		goto out_no_init_images;
 
-	ret = init_fftw();
+	ret = init_fftw(n_threads);
 	if (ret != 0)
 		goto out_no_init_fftw;
 
@@ -290,8 +290,15 @@ static void cleanup_init_images()
  *
  * returns 0 on success, anything else otherwise
  */
-static int init_fftw()
+static int init_fftw(int n_threads)
 {
+	/* make fftw multithreaded */
+
+	if (fftwf_init_threads() == 0)
+		goto out_err;
+
+	fftwf_plan_with_nthreads(n_threads);
+
 	/* allocate memory for doing fft computations */
 	fft_real = fftwf_malloc(width * height * sizeof(*fft_real));
 	if (fft_real == NULL)
