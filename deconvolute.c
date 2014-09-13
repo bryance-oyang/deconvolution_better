@@ -507,6 +507,7 @@ static int cpsf_multiply(float *in[3][2], float *out[3][2])
 	cl_int ret;
 	int c, i;
 
+	/* copy in to opencl buffers */
 	for (c = 0; c < 3; c++) {
 		for (i = 0; i < 2; i++) {
 			ret = clEnqueueWriteBuffer(queue,
@@ -521,6 +522,7 @@ static int cpsf_multiply(float *in[3][2], float *out[3][2])
 		clWaitForEvents(2, copy_events[c]);
 	}
 
+	/* run kernels */
 	for (c = 0; c < 3; c++) {
 		ret = clSetKernelArg(complex_mult_k[c], 0, sizeof(cl_mem),
 				&k_cimage_psf[c][0]);
@@ -561,6 +563,7 @@ static int cpsf_multiply(float *in[3][2], float *out[3][2])
 
 	clWaitForEvents(3, kernel_events);
 
+	/* copy opencl buffers to out */
 	for (c = 0; c < 3; c++) {
 		for (i = 0; i < 2; i++) {
 			ret = clEnqueueReadBuffer(queue,
@@ -582,7 +585,60 @@ out_err:
 
 static int image_input_divide(float *in[3], float *out[3])
 {
+	cl_int ret;
+	int c;
 
+	/* copy in to opencl buffers */
+	for (c = 0; c < 3; c++) {
+		ret = clEnqueueWriteBuffer(queue, k_image_a[c], CL_TRUE,
+				0, width * height * sizeof(cl_float),
+				in[c], 0, NULL, &copy_events[c][0]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
+
+		clWaitForEvents(1, copy_events[c]);
+	}
+
+	/* run kernels */
+	for (c = 0; c < 3; c++) {
+		ret = clSetKernelArg(divide_k[c], 0, sizeof(cl_mem),
+				k_input_image[c]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
+
+		ret = clSetKernelArg(divide_k[c], 1, sizeof(cl_mem),
+				k_image_a[c]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
+
+		ret = clSetKernelArg(divide_k[c], 2, sizeof(cl_mem),
+				k_image_b[c]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
+
+		ret = clEnqueueNDRangeKernel(queue, divide_k[c], 1,
+				NULL, &global_work_size[0], NULL, 0,
+				NULL, &kernel_events[c]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
+	}
+
+	clWaitForEvents(3, kernel_events);
+
+	/* copy opencl buffers to out */
+	for (c = 0; c < 3; c++) {
+		ret = clEnqueueReadBuffer(queue, k_image_b[c], CL_TRUE,
+				0, width * height * sizeof(cl_float),
+				out[c], 0, NULL, NULL);
+		if (ret != CL_SUCCESS)
+			goto out_err;
+	}
+
+	return 0;
+
+out_err:
+	say_function_failed();
+	return -1;
 }
 
 static int cpsf_conj_multiply(float *in[3][2], float *out[3][2])
