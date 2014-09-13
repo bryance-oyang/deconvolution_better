@@ -23,7 +23,6 @@ static uint8_t *original_psf_image;
 /* real images */
 static float *input_image[3];
 static float *current_image[3];
-static float *output_image[3];
 static float *psf_image[3];
 static float *image_a[3];
 static float *image_b[3];
@@ -75,6 +74,8 @@ static void cleanup_init_opencl();
 static int copy_reusables_to_opencl();
 
 static int do_iteration();
+
+static int output(char *output_image_filename);
 
 static int cpsf_multiply(float *in[3][2], float *out[3][2]);
 static int image_input_divide(float *in[3], float *out[3]);
@@ -128,7 +129,11 @@ int deconvolute_image(char *input_image_filename, char
 	}
 
 	/* output result */
+	ret = output(output_image_filename);
+	if (ret != 0)
+		goto out_no_output;
 
+out_no_output:
 out_iteration_failed:
 out_no_copy_reusables:
 	cleanup_init_opencl();
@@ -173,8 +178,6 @@ static int init_images(char *input_image_filename, char *psf_image_filename)
 				sizeof(*input_image[c]));
 		current_image[c] = malloc(width * height *
 				sizeof(*current_image[c]));
-		output_image[c] = malloc(width * height *
-				sizeof(*output_image[c]));
 		psf_image[c] = calloc(width * height,
 				sizeof(*psf_image[c]));
 		image_a[c] = malloc(width * height *
@@ -185,8 +188,6 @@ static int init_images(char *input_image_filename, char *psf_image_filename)
 		if (input_image[c] == NULL)
 			goto out_err;
 		if (current_image[c] == NULL)
-			goto out_err;
-		if (output_image[c] == NULL)
 			goto out_err;
 		if (psf_image[c] == NULL)
 			goto out_err;
@@ -257,8 +258,6 @@ static void cleanup_init_images()
 			free(input_image[c]);
 		if (current_image[c] != NULL)
 			free(current_image[c]);
-		if (output_image[c] != NULL)
-			free(output_image[c]);
 		if (psf_image[c] != NULL)
 			free(psf_image[c]);
 		if (image_a[c] != NULL)
@@ -529,7 +528,7 @@ static int do_iteration()
 
 	ret = cpsf_multiply(cimage_a, cimage_b);
 	if (ret != 0)
-		goto out;
+		goto out_err;
 
 	for (c = 0; c < 3; c++) {
 		ifft(cimage_b[c], image_a[c]);
@@ -538,7 +537,7 @@ static int do_iteration()
 	/* compute original image/(convolution of psf and current image) */
 	ret = image_input_divide(image_a, image_b);
 	if (ret != 0)
-		goto out;
+		goto out_err;
 
 	/* compute convolution of psf(-x) and previous result */
 	for (c = 0; c < 3; c++) {
@@ -547,7 +546,7 @@ static int do_iteration()
 
 	ret = cpsf_conj_multiply(cimage_b, cimage_a);
 	if (ret != 0)
-		goto out;
+		goto out_err;
 
 	for (c = 0; c < 3; c++) {
 		ifft(cimage_a[c], image_a[c]);
@@ -557,10 +556,51 @@ static int do_iteration()
 	 * image */
 	ret = image_multiply(current_image, image_a, current_image);
 	if (ret != 0)
-		goto out;
+		goto out_err;
 
-out:
-	return ret;
+	return 0;
+
+out_err:
+	say_function_failed();
+	return -1;
+}
+
+static int output(char *output_image_filename)
+{
+	int i;
+	int ret;
+	uint16_t *original_output_image;
+
+	/* allocate output buffer */
+	original_output_image = malloc(width * height *
+			sizeof(*original_output_image));
+	if (original_output_image == NULL)
+		goto out_nomem;
+
+	/* copy the current image to output buffer */
+	for (i = 0; i < 3 * width * height; i++) {
+		if (current_image[i%3][i/3] >= 1) {
+			original_output_image[i] = UINT16_MAX;
+		} else {
+			original_output_image[i] =
+				current_image[i%3][i/3];
+		}
+	}
+
+	/* write TIFF image */
+	ret = write_tiff16(output_image_filename, original_output_image,
+			width, height);
+	if (ret != 0)
+		goto out_no_write;
+
+	free(original_output_image);
+	return 0;
+
+out_no_write:
+	free(original_output_image);
+out_nomem:
+	say_function_failed();
+	return -1;
 }
 
 /*
@@ -907,6 +947,6 @@ static void ifft(float *in[2], float *out)
 	fftwf_execute(fft_backward_plan);
 
 	for (i = 0; i < width * height; i++) {
-		out[i] = fft_real[i];
+		out[i] = fft_real[i] / (width * height);
 	}
 }
