@@ -233,8 +233,8 @@ static int init_images(char *input_image_filename, char *psf_image_filename)
 	for (c = 0; c < 3; c++) {
 		for (i = 0; i < psf_width; i++) {
 			for (j = 0; j < psf_height; j++) {
-				x = (width - psf_width)/2 + i;
-				y = (height - psf_height)/2 + j;
+				x = (width - psf_width/2 + i) % width;
+				y = (height - psf_height/2 + j) % height;
 				index = y * width + x;
 				psf_index = 3 * (j * psf_width + i) + c;
 
@@ -345,7 +345,7 @@ static int init_opencl()
 	int ret;
 	int c, i;
 
-	/* set global work sizes */
+	/* set work sizes */
 	global_work_size[0] = width * height;
 	global_work_size[1] = width * (height/2 + 1);
 
@@ -670,8 +670,8 @@ static int cpsf_multiply(float *in[3][2], float *out[3][2])
 		if (ret != CL_SUCCESS)
 			goto out_err;
 
-		ret = clEnqueueNDRangeKernel(queue, complex_mult_k[c], 1,
-				NULL, &global_work_size[1], NULL, 0,
+		ret = clEnqueueNDRangeKernel(queue, complex_mult_k[c],
+				1, NULL, &global_work_size[1], NULL, 0,
 				NULL, &kernel_events[c]);
 		if (ret != CL_SUCCESS)
 			goto out_err;
