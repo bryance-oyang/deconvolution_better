@@ -92,6 +92,10 @@ static void ifft(float *in[2], float *out);
 /*
  * global function to deconvolute an image via Richardson–Lucy
  *
+ * the input image must be a 16-bit RGB TIFF
+ * the psf image must be a 8-bit RGB TIFF (due to GIMP limitations)
+ * the outputted image will be a 16-bit RGB TIFF
+ *
  * if any part of it fails, it will undo itself (goto styled stack-esque
  * wind and unwind)
  *
