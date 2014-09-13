@@ -723,17 +723,17 @@ static int image_input_divide(float *in[3], float *out[3])
 	/* run kernels */
 	for (c = 0; c < 3; c++) {
 		ret = clSetKernelArg(divide_k[c], 0, sizeof(cl_mem),
-				k_input_image[c]);
+				&k_input_image[c]);
 		if (ret != CL_SUCCESS)
 			goto out_err;
 
 		ret = clSetKernelArg(divide_k[c], 1, sizeof(cl_mem),
-				k_image_a[c]);
+				&k_image_a[c]);
 		if (ret != CL_SUCCESS)
 			goto out_err;
 
 		ret = clSetKernelArg(divide_k[c], 2, sizeof(cl_mem),
-				k_image_b[c]);
+				&k_image_b[c]);
 		if (ret != CL_SUCCESS)
 			goto out_err;
 
