@@ -502,6 +502,11 @@ out_err:
 	return -1;
 }
 
+/*
+ * multiply complex psf with complex image
+ *
+ * returns 0 on success, anything else otherwise
+ */
 static int cpsf_multiply(float *in[3][2], float *out[3][2])
 {
 	cl_int ret;
@@ -583,6 +588,11 @@ out_err:
 	return -1;
 }
 
+/*
+ * divide input image with a real image
+ *
+ * returns 0 on success, anything else otherwise
+ */
 static int image_input_divide(float *in[3], float *out[3])
 {
 	cl_int ret;
@@ -641,6 +651,11 @@ out_err:
 	return -1;
 }
 
+/*
+ * multiply conj(psf) with complex image
+ *
+ * returns 0 on success, anything else otherwise
+ */
 static int cpsf_conj_multiply(float *in[3][2], float *out[3][2])
 {
 	cl_int ret;
@@ -723,6 +738,11 @@ out_err:
 	return -1;
 }
 
+/*
+ * multiply two real images
+ *
+ * returns 0 on success, anything else otherwise
+ */
 static int image_multiply(float *a[3], float *b[3], float *out[3])
 {
 	cl_int ret;
