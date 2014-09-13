@@ -202,11 +202,11 @@ static int init_images(char *input_image_filename, char *psf_image_filename)
 
 		/* alloc memory for complex images */
 		for (i = 0; i < 2; i++) {
-			cimage_a[c][i] = malloc(width * (height/2 + 1) *
+			cimage_a[c][i] = malloc((width/2 + 1) * height *
 					sizeof(*cimage_a[c][i]));
-			cimage_b[c][i] = malloc(width * (height/2 + 1) *
+			cimage_b[c][i] = malloc((width/2 + 1) * height *
 					sizeof(*cimage_b[c][i]));
-			cimage_psf[c][i] = malloc(width * (height/2 + 1)
+			cimage_psf[c][i] = malloc((width/2 + 1) * height
 					* sizeof(*cimage_psf[c][i]));
 
 			if (cimage_a[c][i] == NULL)
@@ -297,18 +297,18 @@ static int init_fftw()
 	if (fft_real == NULL)
 		goto out_err;
 
-	fft_complex = fftwf_malloc(width * (height/2 + 1) *
+	fft_complex = fftwf_malloc((width/2 + 1) * height *
 			sizeof(*fft_complex));
 	if (fft_complex == NULL)
 		goto out_err;
 
 	/* create fftw plans for both forward and backward ffts */
-	fft_forward_plan = fftwf_plan_dft_r2c_2d(width, height,
+	fft_forward_plan = fftwf_plan_dft_r2c_2d(height, width,
 			fft_real, fft_complex, FFTW_MEASURE);
 	if (fft_forward_plan == NULL)
 		goto out_err;
 
-	fft_backward_plan = fftwf_plan_dft_c2r_2d(width, height,
+	fft_backward_plan = fftwf_plan_dft_c2r_2d(height, width,
 			fft_complex, fft_real, FFTW_MEASURE);
 	if (fft_backward_plan == NULL)
 		goto out_err;
@@ -347,14 +347,15 @@ static int init_opencl()
 
 	/* set work sizes */
 	global_work_size[0] = width * height;
-	global_work_size[1] = width * (height/2 + 1);
+	global_work_size[1] = (width/2 + 1) * height;
 
 	/* setup context, queue, program, and kernels */
 	ret = cl_utils_setup_gpu(&context, &queue, &device);
 	if (ret != 0)
 		goto out_err;
 
-	ret = cl_utils_create_program(&program, "arithmetic.cl", context, device);
+	ret = cl_utils_create_program(&program, "arithmetic.cl",
+			context, device);
 	if (ret != 0)
 		goto out_err;
 
@@ -403,17 +404,17 @@ static int init_opencl()
 		/* allocate complex buffers */
 		for (i = 0; i < 2; i++) {
 			k_cimage_a[c][i] = clCreateBuffer(context,
-					CL_MEM_READ_WRITE, width *
-					(height/2 + 1) *
-					sizeof(cl_float), NULL, NULL);
+					CL_MEM_READ_WRITE, (width/2 + 1)
+					* height * sizeof(cl_float),
+					NULL, NULL);
 			k_cimage_b[c][i] = clCreateBuffer(context,
-					CL_MEM_READ_WRITE, width *
-					(height/2 + 1) *
-					sizeof(cl_float), NULL, NULL);
+					CL_MEM_READ_WRITE, (width/2 + 1)
+					* height * sizeof(cl_float),
+					NULL, NULL);
 			k_cimage_psf[c][i] = clCreateBuffer(context,
-					CL_MEM_READ_ONLY, width *
-					(height/2 + 1) *
-					sizeof(cl_float), NULL, NULL);
+					CL_MEM_READ_ONLY, (width/2 + 1)
+					* height * sizeof(cl_float),
+					NULL, NULL);
 
 			if (k_cimage_a[c][i] == NULL)
 				goto out_err;
@@ -501,7 +502,7 @@ static int copy_reusables_to_opencl()
 		for (i = 0; i < 2; i++) {
 			ret = clEnqueueWriteBuffer(queue,
 					k_cimage_psf[c][i], CL_TRUE, 0,
-					width * (height/2 + 1) *
+					(width/2 + 1) * height *
 					sizeof(cl_float),
 					cimage_psf[c][i], 0, NULL,
 					&copy_events[c][i]);
@@ -626,7 +627,7 @@ static int cpsf_multiply(float *in[3][2], float *out[3][2])
 		for (i = 0; i < 2; i++) {
 			ret = clEnqueueWriteBuffer(queue,
 					k_cimage_a[c][i], CL_TRUE, 0,
-					width * (height/2 + 1) *
+					(width/2 + 1) * height *
 					sizeof(cl_float), in[c][i], 0,
 					NULL, &copy_events[c][i]);
 			if (ret != CL_SUCCESS)
@@ -686,7 +687,7 @@ static int cpsf_multiply(float *in[3][2], float *out[3][2])
 		for (i = 0; i < 2; i++) {
 			ret = clEnqueueReadBuffer(queue,
 					k_cimage_b[c][i], CL_TRUE, 0,
-					width * (height/2 + 1) *
+					(width/2 + 1) * height *
 					sizeof(cl_float), out[c][i], 0,
 					NULL, NULL);
 			if (ret != CL_SUCCESS)
@@ -783,7 +784,7 @@ static int cpsf_conj_multiply(float *in[3][2], float *out[3][2])
 		for (i = 0; i < 2; i++) {
 			ret = clEnqueueWriteBuffer(queue,
 					k_cimage_a[c][i], CL_TRUE, 0,
-					width * (height/2 + 1) *
+					(width/2 + 1) * height *
 					sizeof(cl_float), in[c][i], 0,
 					NULL, &copy_events[c][i]);
 			if (ret != CL_SUCCESS)
@@ -844,7 +845,7 @@ static int cpsf_conj_multiply(float *in[3][2], float *out[3][2])
 		for (i = 0; i < 2; i++) {
 			ret = clEnqueueReadBuffer(queue,
 					k_cimage_b[c][i], CL_TRUE, 0,
-					width * (height/2 + 1) *
+					(width/2 + 1) * height *
 					sizeof(cl_float), out[c][i], 0,
 					NULL, NULL);
 			if (ret != CL_SUCCESS)
@@ -947,7 +948,7 @@ static void fft(float *in, float *out[2])
 
 	fftwf_execute(fft_forward_plan);
 
-	for (i = 0; i < width * (height/2 + 1); i++) {
+	for (i = 0; i < (width/2 + 1) * height; i++) {
 		out[0][i] = fft_complex[i][0];
 		out[1][i] = fft_complex[i][1];
 	}
@@ -963,7 +964,7 @@ static void ifft(float *in[2], float *out)
 {
 	int i;
 
-	for (i = 0; i < width * (height/2 + 1); i++) {
+	for (i = 0; i < (width/2 + 1) * height; i++) {
 		fft_complex[i][0] = in[0][i];
 		fft_complex[i][1] = in[1][i];
 	}
