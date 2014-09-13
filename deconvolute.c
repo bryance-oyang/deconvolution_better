@@ -407,7 +407,7 @@ static int init_opencl()
 					(height/2 + 1) *
 					sizeof(cl_float), NULL, NULL);
 			k_cimage_psf[c][i] = clCreateBuffer(context,
-					CL_MEM_READ_WRITE, width *
+					CL_MEM_READ_ONLY, width *
 					(height/2 + 1) *
 					sizeof(cl_float), NULL, NULL);
 
