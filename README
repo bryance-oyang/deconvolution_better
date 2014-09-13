@@ -1,4 +1,4 @@
-The new and improved Richardson–Lucy deconvolution with OpenCL and FFTW, now 50 times faster!
+The new and improved Richardson–Lucy deconvolution with OpenCL and FFTW
 
 - added fft's to do integrals on CPU, and OpenCL to do point-wise arithmetic on GPU
 
