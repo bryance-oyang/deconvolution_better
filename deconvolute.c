@@ -522,38 +522,38 @@ static int cpsf_multiply(float *in[3][2], float *out[3][2])
 	}
 
 	for (c = 0; c < 3; c++) {
-		ret = clSetKernelArg(complex_mult_k, 0, sizeof(cl_mem),
+		ret = clSetKernelArg(complex_mult_k[c], 0, sizeof(cl_mem),
 				&k_cimage_psf[c][0]);
 		if (ret != CL_SUCCESS)
 			goto out_err;
 
-		ret = clSetKernelArg(complex_mult_k, 1, sizeof(cl_mem),
+		ret = clSetKernelArg(complex_mult_k[c], 1, sizeof(cl_mem),
 				&k_cimage_psf[c][1]);
 		if (ret != CL_SUCCESS)
 			goto out_err;
 
-		ret = clSetKernelArg(complex_mult_k, 2, sizeof(cl_mem),
+		ret = clSetKernelArg(complex_mult_k[c], 2, sizeof(cl_mem),
 				&k_cimage_a[c][0]);
 		if (ret != CL_SUCCESS)
 			goto out_err;
 
-		ret = clSetKernelArg(complex_mult_k, 3, sizeof(cl_mem),
+		ret = clSetKernelArg(complex_mult_k[c], 3, sizeof(cl_mem),
 				&k_cimage_a[c][1]);
 		if (ret != CL_SUCCESS)
 			goto out_err;
 
-		ret = clSetKernelArg(complex_mult_k, 4, sizeof(cl_mem),
+		ret = clSetKernelArg(complex_mult_k[c], 4, sizeof(cl_mem),
 				&k_cimage_b[c][0]);
 		if (ret != CL_SUCCESS)
 			goto out_err;
 
-		ret = clSetKernelArg(complex_mult_k, 5, sizeof(cl_mem),
+		ret = clSetKernelArg(complex_mult_k[c], 5, sizeof(cl_mem),
 				&k_cimage_b[c][1]);
 		if (ret != CL_SUCCESS)
 			goto out_err;
 
-		ret = clEnqueueNDRangeKernel(queue, complex_mult_k, 1,
-				NULL, global_work_size[1], NULL, 0,
+		ret = clEnqueueNDRangeKernel(queue, complex_mult_k[c], 1,
+				NULL, &global_work_size[1], NULL, 0,
 				NULL, &kernel_events[c]);
 		if (ret != CL_SUCCESS)
 			goto out_err;
