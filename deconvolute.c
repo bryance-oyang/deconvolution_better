@@ -576,7 +576,7 @@ static int output(char *output_image_filename)
 	ret = -1;
 
 	/* allocate output buffer */
-	original_output_image = malloc(width * height *
+	original_output_image = malloc(3 * width * height *
 			sizeof(*original_output_image));
 	if (original_output_image == NULL)
 		goto out_nomem;
