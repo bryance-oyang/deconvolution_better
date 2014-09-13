@@ -1,16 +1,10 @@
-The new and improved Richardson–Lucy deconvolution with OpenCL and FFTW,
-now 50 times faster!
+The new and improved Richardson–Lucy deconvolution with OpenCL and FFTW, now 50 times faster!
 
-- added fft's to do integrals on CPU, and OpenCL to do point-wise arithmetic
-on GPU
+- added fft's to do integrals on CPU, and OpenCL to do point-wise arithmetic on GPU
 
-- proper error handling, if exceptions are encountered, functions will clean
-up after themselves, dealloc all buffers, etc etc, which also allows usage in
-larger programs without crashing them
+- proper error handling, if exceptions are encountered, functions will clean up after themselves, dealloc all buffers, etc etc, which also allows usage in larger programs without crashing them
 
-- larger programs need only #include "deconvolute.h" and call
-deconvolute_image(input, psf, output, number of iterations,
-number of threads to use for fftw)
+- larger programs need only #include "deconvolute.h" and call deconvolute_image(input, psf, output, number of iterations, number of threads to use for fftw)
 
 - probably still has many bugs though, but so far runs smoothly
 
