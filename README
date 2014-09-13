@@ -9,3 +9,8 @@ The new and improved Richardson–Lucy deconvolution with OpenCL and FFTW, now 5
 - probably still has many bugs though, but so far runs smoothly
 
 main.c is example usage of deconvolute_image()
+
+== Prerequisites ==
+- OpenCL
+- libtiff
+- libfftw3 float (instead of double) and multi-thread enabled version
