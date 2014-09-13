@@ -661,7 +661,7 @@ static int cpsf_conj_multiply(float *in[3][2], float *out[3][2])
 		clWaitForEvents(2, copy_events[c]);
 	}
 
-	/* run kernel */
+	/* run kernels */
 	for (c = 0; c < 3; c++) {
 		ret = clSetKernelArg(complex_conj_mult_k[c], 0,
 				sizeof(cl_mem), &k_cimage_psf[c][0]);
@@ -725,7 +725,66 @@ out_err:
 
 static int image_multiply(float *a[3], float *b[3], float *out[3])
 {
+	cl_int ret;
+	int c;
 
+	/* copy images to opencl buffers */
+	for (c = 0; c < 3; c++) {
+		ret = clEnqueueWriteBuffer(queue, k_image_a[c], CL_TRUE,
+				0, width * height * sizeof(cl_float),
+				a[c], 0, NULL, &copy_events[c][0]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
+
+		ret = clEnqueueWriteBuffer(queue, k_image_b[c], CL_TRUE,
+				0, width * height * sizeof(cl_float),
+				b[c], 0, NULL, &copy_events[c][1]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
+
+		clWaitForEvents(2, copy_events[c]);
+	}
+
+	/* run kernels */
+	for (c = 0; c < 3; c++) {
+		ret = clSetKernelArg(mult_k[c], 0, sizeof(cl_mem),
+				&k_image_a[c]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
+
+		ret = clSetKernelArg(mult_k[c], 1, sizeof(cl_mem),
+				&k_image_b[c]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
+
+		ret = clSetKernelArg(mult_k[c], 2, sizeof(cl_mem),
+				&k_image_c[c]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
+
+		ret = clEnqueueNDRangeKernel(queue, mult_k[c], 1, NULL,
+				&global_work_size[0], NULL, 0, NULL,
+				&kernel_events[c]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
+	}
+
+	clWaitForEvents(3, kernel_events);
+
+	/* copy opencl buffers to out */
+	for (c = 0; c < 3; c++) {
+		ret = clEnqueueReadBuffer(queue, k_image_c[c], CL_TRUE,
+				0, width * height * sizeof(cl_float),
+				out[c], 0, NULL, NULL);
+		if (ret != CL_SUCCESS)
+			goto out_err;
+	}
+
+	return 0;
+
+out_err:
+	say_function_failed();
+	return -1;
 }
 
 /*
