@@ -643,7 +643,84 @@ out_err:
 
 static int cpsf_conj_multiply(float *in[3][2], float *out[3][2])
 {
+	cl_int ret;
+	int c, i;
 
+	/* copy in to opencl buffers */
+	for (c = 0; c < 3; c++) {
+		for (i = 0; i < 2; i++) {
+			ret = clEnqueueWriteBuffer(queue,
+					k_cimage_a[c][i], CL_TRUE, 0,
+					width * (height/2 + 1) *
+					sizeof(cl_float), in[c][i], 0,
+					NULL, &copy_events[c][i]);
+			if (ret != CL_SUCCESS)
+				goto out_err;
+		}
+
+		clWaitForEvents(2, copy_events[c]);
+	}
+
+	/* run kernel */
+	for (c = 0; c < 3; c++) {
+		ret = clSetKernelArg(complex_conj_mult_k[c], 0,
+				sizeof(cl_mem), &k_cimage_psf[c][0]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
+
+		ret = clSetKernelArg(complex_conj_mult_k[c], 1,
+				sizeof(cl_mem), &k_cimage_psf[c][1]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
+
+		ret = clSetKernelArg(complex_conj_mult_k[c], 2,
+				sizeof(cl_mem), &k_cimage_a[c][0]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
+
+		ret = clSetKernelArg(complex_conj_mult_k[c], 3,
+				sizeof(cl_mem), &k_cimage_a[c][1]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
+
+		ret = clSetKernelArg(complex_conj_mult_k[c], 4,
+				sizeof(cl_mem), &k_cimage_b[c][0]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
+
+		ret = clSetKernelArg(complex_conj_mult_k[c], 5,
+				sizeof(cl_mem), &k_cimage_b[c][1]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
+
+		ret = clEnqueueNDRangeKernel(queue,
+				complex_conj_mult_k[c], 1, NULL,
+				&global_work_size[1], NULL, 0, NULL,
+				&kernel_events[c]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
+	}
+
+	clWaitForEvents(3, kernel_events);
+
+	/* copy opencl buffers to out */
+	for (c = 0; c < 3; c++) {
+		for (i = 0; i < 2; i++) {
+			ret = clEnqueueReadBuffer(queue,
+					k_cimage_b[c][i], CL_TRUE, 0,
+					width * (height/2 + 1) *
+					sizeof(cl_float), out[c][i], 0,
+					NULL, NULL);
+			if (ret != CL_SUCCESS)
+				goto out_err;
+		}
+	}
+
+	return 0;
+
+out_err:
+	say_function_failed();
+	return -1;
 }
 
 static int image_multiply(float *a[3], float *b[3], float *out[3])
