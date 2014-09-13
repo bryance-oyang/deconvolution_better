@@ -505,14 +505,16 @@ static int copy_reusables_to_opencl()
 				goto out_err;
 		}
 
-		clWaitForEvents(3, copy_events[c]);
+		ret = clWaitForEvents(3, copy_events[c]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
 	}
 
 	return 0;
 
 out_err:
 	say_function_failed();
-	return -1;
+	return ret;
 }
 
 /* do one iteration of Richardson–Lucy deconvolution */
@@ -571,6 +573,8 @@ static int output(char *output_image_filename)
 	int ret;
 	uint16_t *original_output_image;
 
+	ret = -1;
+
 	/* allocate output buffer */
 	original_output_image = malloc(width * height *
 			sizeof(*original_output_image));
@@ -600,7 +604,7 @@ out_no_write:
 	free(original_output_image);
 out_nomem:
 	say_function_failed();
-	return -1;
+	return ret;
 }
 
 /*
@@ -625,7 +629,9 @@ static int cpsf_multiply(float *in[3][2], float *out[3][2])
 				goto out_err;
 		}
 
-		clWaitForEvents(2, copy_events[c]);
+		ret = clWaitForEvents(2, copy_events[c]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
 	}
 
 	/* run kernels */
@@ -667,7 +673,9 @@ static int cpsf_multiply(float *in[3][2], float *out[3][2])
 			goto out_err;
 	}
 
-	clWaitForEvents(3, kernel_events);
+	ret = clWaitForEvents(3, kernel_events);
+	if (ret != CL_SUCCESS)
+		goto out_err;
 
 	/* copy opencl buffers to out */
 	for (c = 0; c < 3; c++) {
@@ -686,7 +694,7 @@ static int cpsf_multiply(float *in[3][2], float *out[3][2])
 
 out_err:
 	say_function_failed();
-	return -1;
+	return ret;
 }
 
 /*
@@ -707,7 +715,9 @@ static int image_input_divide(float *in[3], float *out[3])
 		if (ret != CL_SUCCESS)
 			goto out_err;
 
-		clWaitForEvents(1, copy_events[c]);
+		ret = clWaitForEvents(1, copy_events[c]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
 	}
 
 	/* run kernels */
@@ -734,7 +744,9 @@ static int image_input_divide(float *in[3], float *out[3])
 			goto out_err;
 	}
 
-	clWaitForEvents(3, kernel_events);
+	ret = clWaitForEvents(3, kernel_events);
+	if (ret != CL_SUCCESS)
+		goto out_err;
 
 	/* copy opencl buffers to out */
 	for (c = 0; c < 3; c++) {
@@ -749,7 +761,7 @@ static int image_input_divide(float *in[3], float *out[3])
 
 out_err:
 	say_function_failed();
-	return -1;
+	return ret;
 }
 
 /*
@@ -774,7 +786,9 @@ static int cpsf_conj_multiply(float *in[3][2], float *out[3][2])
 				goto out_err;
 		}
 
-		clWaitForEvents(2, copy_events[c]);
+		ret = clWaitForEvents(2, copy_events[c]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
 	}
 
 	/* run kernels */
@@ -817,7 +831,9 @@ static int cpsf_conj_multiply(float *in[3][2], float *out[3][2])
 			goto out_err;
 	}
 
-	clWaitForEvents(3, kernel_events);
+	ret = clWaitForEvents(3, kernel_events);
+	if (ret != CL_SUCCESS)
+		goto out_err;
 
 	/* copy opencl buffers to out */
 	for (c = 0; c < 3; c++) {
@@ -836,7 +852,7 @@ static int cpsf_conj_multiply(float *in[3][2], float *out[3][2])
 
 out_err:
 	say_function_failed();
-	return -1;
+	return ret;
 }
 
 /*
@@ -863,7 +879,9 @@ static int image_multiply(float *a[3], float *b[3], float *out[3])
 		if (ret != CL_SUCCESS)
 			goto out_err;
 
-		clWaitForEvents(2, copy_events[c]);
+		ret = clWaitForEvents(2, copy_events[c]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
 	}
 
 	/* run kernels */
@@ -890,7 +908,9 @@ static int image_multiply(float *a[3], float *b[3], float *out[3])
 			goto out_err;
 	}
 
-	clWaitForEvents(3, kernel_events);
+	ret = clWaitForEvents(3, kernel_events);
+	if (ret != CL_SUCCESS)
+		goto out_err;
 
 	/* copy opencl buffers to out */
 	for (c = 0; c < 3; c++) {
@@ -905,7 +925,7 @@ static int image_multiply(float *a[3], float *b[3], float *out[3])
 
 out_err:
 	say_function_failed();
-	return -1;
+	return ret;
 }
 
 /*
