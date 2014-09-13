@@ -587,7 +587,7 @@ static int output(char *output_image_filename)
 			original_output_image[i] = UINT16_MAX;
 		} else {
 			original_output_image[i] =
-				current_image[i%3][i/3];
+				current_image[i%3][i/3] * UINT16_MAX;
 		}
 	}
 
