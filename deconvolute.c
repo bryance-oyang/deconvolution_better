@@ -56,6 +56,7 @@ static cl_event kernel_events[3];
 static cl_mem k_input_image[3];
 static cl_mem k_image_a[3];
 static cl_mem k_image_b[3];
+static cl_mem k_image_c[3];
 static cl_mem k_cimage_a[3][2];
 static cl_mem k_cimage_b[3][2];
 static cl_mem k_cimage_psf[3][2];
@@ -73,9 +74,13 @@ static void cleanup_init_opencl();
 
 static int copy_reusables_to_opencl();
 
+static int cpsf_multiply(float *in[3][2], float *out[3][2]);
+static int image_input_divide(float *in[3], float *out[3]);
+static int cpsf_conj_multiply(float *in[3][2], float *out[3][2]);
+static int image_multiply(float *a[3], float *b[3], float *out[3]);
+
 static void fft(float *in, float *out[2]);
 static void ifft(float *in[2], float *out);
-
 
 /******************/
 /* IMPLEMENTATION */
@@ -124,7 +129,6 @@ out_no_init_images:
 /********************/
 /* STATIC FUNCTIONS */
 /********************/
-
 
 /*
  * read in images, alloc memory for real images, pad and normalize
@@ -366,12 +370,17 @@ static int init_opencl()
 		k_image_b[c] = clCreateBuffer(context,
 				CL_MEM_READ_WRITE, width * height *
 				sizeof(cl_float), NULL, NULL);
+		k_image_c[c] = clCreateBuffer(context,
+				CL_MEM_READ_WRITE, width * height *
+				sizeof(cl_float), NULL, NULL);
 
 		if (k_input_image[c] == NULL)
 			goto out_err;
 		if (k_image_a[c] == NULL)
 			goto out_err;
 		if (k_image_b[c] == NULL)
+			goto out_err;
+		if (k_image_c[c] == NULL)
 			goto out_err;
 
 		/* allocate complex buffers */
@@ -418,6 +427,9 @@ static void cleanup_init_opencl()
 			clReleaseMemObject(k_image_a[c]);
 		if (k_image_b[c] != NULL)
 			clReleaseMemObject(k_image_b[c]);
+		if (k_image_c[c] != NULL)
+			clReleaseMemObject(k_image_c[c]);
+
 		for (i = 0; i < 2; i++) {
 			if (k_cimage_a[c][i] != NULL)
 				clReleaseMemObject(k_cimage_a[c][i]);
@@ -453,7 +465,7 @@ static void cleanup_init_opencl()
  */
 static int copy_reusables_to_opencl()
 {
-	int ret;
+	cl_int ret;
 	int c, i;
 
 	/* compute fft of psf */
@@ -488,6 +500,99 @@ static int copy_reusables_to_opencl()
 out_err:
 	say_function_failed();
 	return -1;
+}
+
+static int cpsf_multiply(float *in[3][2], float *out[3][2])
+{
+	cl_int ret;
+	int c, i;
+
+	for (c = 0; c < 3; c++) {
+		for (i = 0; i < 2; i++) {
+			ret = clEnqueueWriteBuffer(queue,
+					k_cimage_a[c][i], CL_TRUE, 0,
+					width * (height/2 + 1) *
+					sizeof(cl_float), in[c][i], 0,
+					NULL, &copy_events[c][i]);
+			if (ret != CL_SUCCESS)
+				goto out_err;
+		}
+
+		clWaitForEvents(2, copy_events[c]);
+	}
+
+	for (c = 0; c < 3; c++) {
+		ret = clSetKernelArg(complex_mult_k, 0, sizeof(cl_mem),
+				&k_cimage_psf[c][0]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
+
+		ret = clSetKernelArg(complex_mult_k, 1, sizeof(cl_mem),
+				&k_cimage_psf[c][1]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
+
+		ret = clSetKernelArg(complex_mult_k, 2, sizeof(cl_mem),
+				&k_cimage_a[c][0]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
+
+		ret = clSetKernelArg(complex_mult_k, 3, sizeof(cl_mem),
+				&k_cimage_a[c][1]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
+
+		ret = clSetKernelArg(complex_mult_k, 4, sizeof(cl_mem),
+				&k_cimage_b[c][0]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
+
+		ret = clSetKernelArg(complex_mult_k, 5, sizeof(cl_mem),
+				&k_cimage_b[c][1]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
+
+		ret = clEnqueueNDRangeKernel(queue, complex_mult_k, 1,
+				NULL, global_work_size[1], NULL, 0,
+				NULL, &kernel_events[c]);
+		if (ret != CL_SUCCESS)
+			goto out_err;
+	}
+
+	clWaitForEvents(3, kernel_events);
+
+	for (c = 0; c < 3; c++) {
+		for (i = 0; i < 2; i++) {
+			ret = clEnqueueReadBuffer(queue,
+					k_cimage_b[c][i], CL_TRUE, 0,
+					width * (height/2 + 1) *
+					sizeof(cl_float), out[c][i], 0,
+					NULL, NULL);
+			if (ret != CL_SUCCESS)
+				goto out_err;
+		}
+	}
+
+	return 0;
+
+out_err:
+	say_function_failed();
+	return -1;
+}
+
+static int image_input_divide(float *in[3], float *out[3])
+{
+
+}
+
+static int cpsf_conj_multiply(float *in[3][2], float *out[3][2])
+{
+
+}
+
+static int image_multiply(float *a[3], float *b[3], float *out[3])
+{
+
 }
 
 /*
