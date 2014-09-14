@@ -127,6 +127,8 @@ int deconvolute_image(char *input_image_filename, char
 
 	/* run deconvolution */
 	for (i = 0; i < n_iterations; i++) {
+		printf("Pass %d...\n", i);
+
 		ret = do_iteration();
 		if (ret != 0)
 			goto out_iteration_failed;
