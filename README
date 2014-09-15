@@ -10,6 +10,14 @@ The new and improved Richardson–Lucy deconvolution with OpenCL and FFTW
 
 main.c is example usage of deconvolute_image()
 
+== Usage Notes ==
+- input image must be 16-bit RGB TIFF
+- psf image must be 8-bit RGB TIFF, due to GIMP limitations, i.e. you open the input image in GIMP, trace out a white psf with pencil tool, make background black, export TIFF (or you can modify source code to allow 16-bit psf if not using GIMP)
+- output image will be 16-bit RGB TIFF
+- due to memory limitations, you may need to scale your image smaller to avoid running out of memory
+- all files here are needed except Makefile (you can write your own), main.c (an example usage of deconvolute_image), and README
+- either #include "deconvolute.h" or declare extern int deconvolute_image(char *, char *, char *, int, int);
+
 == Prerequisites ==
 - libc (-lc)
 - OpenCL (-lOpenCL)
