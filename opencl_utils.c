@@ -1,7 +1,16 @@
-#include "opencl_utils.h"
+/*
+ * Utilities for dealing with OpenCL
+ *
+ * Copyright (C) 2014 Bryance Oyang
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <CL/opencl.h>
 
 /*
  * reads a file and returns a malloced char* of its contents
@@ -47,7 +56,7 @@ out_no_open:
 
 /*
  * creates opencl context and command queue using gpu device
- * 
+ *
  * returns 0 on success, anything else on failure
  */
 int cl_utils_setup_gpu(cl_context *context, cl_command_queue
@@ -80,6 +89,8 @@ out_no_queue:
 	clReleaseContext(*context);
 	*context = NULL;
 out_err:
+	fprintf(stderr, "cl_utils_setup_gpu: failed\n");
+	fflush(stderr);
 	return -1;
 }
 
@@ -98,7 +109,7 @@ void cl_utils_cleanup_gpu(cl_context *context, cl_command_queue
 
 /*
  * create a opencl program from source code in filename
- * 
+ *
  * returns 0 on success, anything else otherwise
  */
 int cl_utils_create_program(cl_program *program, char *filename,
@@ -120,21 +131,21 @@ int cl_utils_create_program(cl_program *program, char *filename,
 	*program = clCreateProgramWithSource(context, 1,
 			(const char **) &source_code, NULL, &err);
 	if (err != CL_SUCCESS) {
-		fprintf(stderr, "clCreateProgramWithSource failed\n");
+		fprintf(stderr, "cl_utils_create_program: clCreateProgramWithSource failed\n");
 		fflush(stderr);
 		goto out_no_program;
 	}
 
 	err = clBuildProgram(*program, 1, &device, NULL, NULL, NULL);
 	if (err != CL_SUCCESS) {
-		fprintf(stderr, "clBuildProgram failed\n");
+		fprintf(stderr, "cl_utils_create_program: clBuildProgram failed\n");
 
 		clGetProgramBuildInfo(*program, device,
 				CL_PROGRAM_BUILD_LOG, 0, NULL,
 				&build_log_size);
 		build_log = malloc(build_log_size);
 		if (build_log == NULL) {
-			fprintf(stderr, "No memory for build log\n");
+			fprintf(stderr, "cl_utils_create_program: No memory for build log\n");
 			fflush(stderr);
 			goto out_build_fail;
 		}
