@@ -17,8 +17,7 @@
 #include "opencl_utils.h"
 
 #define say_function_failed() \
-	fprintf(stderr, "%s: %s: failed\n", __FILE__, __func__); \
-	fflush(stderr);
+	fprintf(stderr, "%s: %s: failed\n", __FILE__, __func__) \
 
 /********************************/
 /* STATIC VARS, PROTOTYPES, ETC */
