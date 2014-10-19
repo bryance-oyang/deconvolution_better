@@ -267,31 +267,21 @@ static void cleanup_init_images()
 	int c, i;
 
 	for (c = 0; c < 3; c++) {
-		if (input_image[c] != NULL)
-			free(input_image[c]);
-		if (current_image[c] != NULL)
-			free(current_image[c]);
-		if (psf_image[c] != NULL)
-			free(psf_image[c]);
-		if (image_a[c] != NULL)
-			free(image_a[c]);
-		if (image_b[c] != NULL)
-			free(image_b[c]);
+		free(input_image[c]);
+		free(current_image[c]);
+		free(psf_image[c]);
+		free(image_a[c]);
+		free(image_b[c]);
 
 		for (i = 0; i < 2; i++) {
-			if (cimage_a[c][i] != NULL)
-				free(cimage_a[c][i]);
-			if (cimage_b[c][i] != NULL)
-				free(cimage_b[c][i]);
-			if (cimage_psf[c][i] != NULL)
-				free(cimage_psf[c][i]);
+			free(cimage_a[c][i]);
+			free(cimage_b[c][i]);
+			free(cimage_psf[c][i]);
 		}
 	}
 
-	if (original_psf_image != NULL)
-		free(original_psf_image);
-	if (original_input_image != NULL)
-		free(original_input_image);
+	free(original_psf_image);
+	free(original_input_image);
 }
 
 /*
@@ -302,7 +292,6 @@ static void cleanup_init_images()
 static int init_fftw(int n_threads)
 {
 	/* make fftw multithreaded */
-
 	if (fftwf_init_threads() == 0)
 		goto out_err;
 
